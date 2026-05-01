@@ -1,4 +1,7 @@
-// dashboard.routes.js
-module.exports = (router) => {
-  router.get('/dashboard', (req, res) => res.send('dashboard'));
-};
+const express = require('express');
+const router = express.Router();
+const ctrl = require('./dashboard.controller');
+
+router.get('/summary', ctrl.getSummary);
+
+module.exports = router;
