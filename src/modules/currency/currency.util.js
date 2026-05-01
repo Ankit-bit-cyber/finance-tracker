@@ -1,2 +1,6 @@
 // currency.util.js
-exports.format = (v) => '$' + Number(v).toFixed(2);
+const currencyService = require('./currency.service');
+
+const convertAmount = async (amount, from, to) => currencyService.convert(amount, from, to);
+
+module.exports = { convertAmount };
