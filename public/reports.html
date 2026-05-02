@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Reports — Finance Tracker</title>
+  <link rel="stylesheet" href="/css/main.css"/>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+<body>
+<script src="/js/api.js"></script>
+<script src="/js/nav.js"></script>
+
+<main>
+<div class="container">
+  <div class="page-header">
+    <h1>📈 Reports</h1>
+  </div>
+
+  <!-- Report Type Tabs -->
+  <div style="display:flex;gap:8px;margin-bottom:24px">
+    <button class="btn btn-primary" id="tabMonthly" onclick="switchTab('monthly')">Monthly Report</button>
+    <button class="btn btn-outline" id="tabYearly"  onclick="switchTab('yearly')">Yearly Report</button>
+  </div>
+
+  <!-- ── MONTHLY ─────────────────────────────────── -->
+  <div id="panelMonthly">
+    <!-- Controls -->
+    <div class="card" style="padding:14px 20px;margin-bottom:20px;display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+      <select id="mMonth">
+        <option value="1">January</option><option value="2">February</option>
+        <option value="3">March</option><option value="4">April</option>
+        <option value="5">May</option><option value="6">June</option>
+        <option value="7">July</option><option value="8">August</option>
+        <option value="9">September</option><option value="10">October</option>
+        <option value="11">November</option><option value="12">December</option>
+      </select>
+      <select id="mYear"></select>
+      <button class="btn btn-primary btn-sm" onclick="loadMonthly()">Generate</button>
+    </div>
+
+    <!-- Summary Cards -->
+    <div class="grid-4" style="margin-bottom:24px">
+      <div class="card"><div class="card-title">Total Income</div><div class="card-value income" id="mIncome">—</div></div>
+      <div class="card"><div class="card-title">Total Expenses</div><div class="card-value expense" id="mExpense">—</div></div>
+      <div class="card"><div class="card-title">Net Savings</div><div class="card-value savings" id="mSavings">—</div></div>
+      <div class="card"><div class="card-title">Savings Rate</div><div class="card-value" id="mRate" style="color:var(--primary)">—</div></div>
+    </div>
+
+    <!-- Charts -->
+    <div class="grid-2" style="margin-bottom:24px">
+      <div class="card">
+        <strong style="display:block;margin-bottom:14px">Daily Cash Flow</strong>
+        <canvas id="dailyChart" height="240"></canvas>
+      </div>
+      <div class="card">
+        <strong style="display:block;margin-bottom:14px">Expense Categories</strong>
+        <canvas id="mDonut" height="240"></canvas>
+      </div>
+    </div>
+
+    <!-- Category Breakdown Tables -->
+    <div class="grid-2">
+      <div class="card">
+        <strong style="display:block;margin-bottom:14px">💸 Expenses by Category</strong>
+        <table>
+          <thead><tr><th>Category</th><th>Transactions</th><th>Total</th></tr></thead>
+          <tbody id="expenseCatTable"><tr><td colspan="3" style="color:var(--muted);padding:20px;text-align:center">—</td></tr></tbody>
+        </table>
+      </div>
+      <div class="card">
+        <strong style="display:block;margin-bottom:14px">💰 Income by Category</strong>
+        <table>
+          <thead><tr><th>Category</th><th>Transactions</th><th>Total</th></tr></thead>
+          <tbody id="incomeCatTable"><tr><td colspan="3" style="color:var(--muted);padding:20px;text-align:center">—</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── YEARLY ──────────────────────────────────── -->
+  <div id="panelYearly" class="hidden">
+    <div class="card" style="padding:14px 20px;margin-bottom:20px;display:flex;gap:12px;align-items:center">
+      <select id="yYear"></select>
+      <button class="btn btn-primary btn-sm" onclick="loadYearly()">Generate</button>
+    </div>
+
+    <div class="grid-4" style="margin-bottom:24px">
+      <div class="card"><div class="card-title">Year Income</div><div class="card-value income" id="yIncome">—</div></div>
+      <div class="card"><div class="card-title">Year Expenses</div><div class="card-value expense" id="yExpense">—</div></div>
+      <div class="card"><div class="card-title">Year Savings</div><div class="card-value savings" id="ySavings">—</div></div>
+      <div class="card"><div class="card-title">Avg Monthly Saving</div><div class="card-value" id="yAvg" style="color:var(--primary)">—</div></div>
+    </div>
+
+    <div class="card" style="margin-bottom:24px">
+      <strong style="display:block;margin-bottom:14px">Monthly Overview — Full Year</strong>
+      <canvas id="yearlyChart" height="260"></canvas>
+    </div>
+
+    <div class="card">
+      <strong style="display:block;margin-bottom:14px">Month-by-Month Breakdown</strong>
+      <table>
+        <thead><tr><th>Month</th><th>Income</th><th>Expenses</th><th>Savings</th><th>Savings Rate</th></tr></thead>
+        <tbody id="yearlyTable"></tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+</main>
+
+<script>
+let dailyChart, mDonutChart, yearlyChart;
+const MONTHS = ['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+function fmt(n) {
+  return parseFloat(n||0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function switchTab(tab) {
+  document.getElementById('panelMonthly').classList.toggle('hidden', tab !== 'monthly');
+  document.getElementById('panelYearly').classList.toggle('hidden',  tab !== 'yearly');
+  document.getElementById('tabMonthly').className = tab === 'monthly' ? 'btn btn-primary' : 'btn btn-outline';
+  document.getElementById('tabYearly').className  = tab === 'yearly'  ? 'btn btn-primary' : 'btn btn-outline';
+}
+
+function init() {
+  const now = new Date();
+  const curYear = now.getFullYear();
+
+  document.getElementById('mMonth').value = now.getMonth() + 1;
+
+  [document.getElementById('mYear'), document.getElementById('yYear')].forEach(sel => {
+    for (let y = curYear - 3; y <= curYear; y++) sel.add(new Option(y, y));
+    sel.value = curYear;
+  });
+
+  loadMonthly();
+}
+
+async function loadMonthly() {
+  const month = document.getElementById('mMonth').value;
+  const year  = document.getElementById('mYear').value;
+  const data  = await api.get(`/reports/monthly?month=${month}&year=${year}`);
+
+  document.getElementById('mIncome').textContent  = fmt(data.income);
+  document.getElementById('mExpense').textContent = fmt(data.expense);
+  document.getElementById('mSavings').textContent = fmt(data.savings);
+  document.getElementById('mRate').textContent    = (data.savings_rate || 0) + '%';
+
+  buildDailyChart(data.daily_breakdown || []);
+  buildMDonut(data.expense_categories || []);
+  buildCatTable('expenseCatTable', data.expense_categories || []);
+  buildCatTable('incomeCatTable',  data.income_categories  || []);
+}
+
+function buildDailyChart(daily) {
+  // Group by date
+  const map = {};
+  daily.forEach(r => {
+    if (!map[r.date]) map[r.date] = { income: 0, expense: 0 };
+    map[r.date][r.type] = parseFloat(r.total);
+  });
+  const labels   = Object.keys(map).sort();
+  const incomes  = labels.map(d => map[d].income  || 0);
+  const expenses = labels.map(d => map[d].expense || 0);
+
+  if (dailyChart) dailyChart.destroy();
+  dailyChart = new Chart(document.getElementById('dailyChart'), {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        { label: 'Income',  data: incomes,  borderColor: '#10b981', backgroundColor: '#10b98122', fill: true, tension: 0.3 },
+        { label: 'Expense', data: expenses, borderColor: '#ef4444', backgroundColor: '#ef444422', fill: true, tension: 0.3 },
+      ],
+    },
+    options: { responsive: true, plugins: { legend: { position: 'bottom' } }, scales: { y: { beginAtZero: true } } },
+  });
+}
+
+function buildMDonut(cats) {
+  if (!cats.length) return;
+  const colors = ['#4f46e5','#10b981','#ef4444','#f59e0b','#06b6d4','#8b5cf6','#ec4899','#14b8a6','#f97316','#84cc16'];
+  if (mDonutChart) mDonutChart.destroy();
+  mDonutChart = new Chart(document.getElementById('mDonut'), {
+    type: 'doughnut',
+    data: {
+      labels: cats.map(c => c.category || 'Other'),
+      datasets: [{ data: cats.map(c => parseFloat(c.total)), backgroundColor: colors }],
+    },
+    options: { responsive: true, plugins: { legend: { position: 'bottom' } } },
+  });
+}
+
+function buildCatTable(tbodyId, cats) {
+  const tbody = document.getElementById(tbodyId);
+  if (!cats.length) {
+    tbody.innerHTML = '<tr><td colspan="3" style="color:var(--muted);padding:20px;text-align:center">No data</td></tr>';
+    return;
+  }
+  tbody.innerHTML = cats.map(c => `
+    <tr>
+      <td>${c.icon || '📦'} ${c.category || 'Uncategorized'}</td>
+      <td style="color:var(--muted)">${c.count}</td>
+      <td style="font-weight:600">${fmt(c.total)}</td>
+    </tr>`).join('');
+}
+
+async function loadYearly() {
+  const year = document.getElementById('yYear').value;
+  const data = await api.get(`/reports/yearly?year=${year}`);
+
+  document.getElementById('yIncome').textContent  = fmt(data.totals.income);
+  document.getElementById('yExpense').textContent = fmt(data.totals.expense);
+  document.getElementById('ySavings').textContent = fmt(data.totals.savings);
+  const avgSaving = data.months.length ? data.totals.savings / data.months.length : 0;
+  document.getElementById('yAvg').textContent = fmt(avgSaving);
+
+  buildYearlyChart(data.months);
+  buildYearlyTable(data.months);
+}
+
+function buildYearlyChart(months) {
+  const labels   = months.map(m => MONTHS[m.month]);
+  const incomes  = months.map(m => m.income  || 0);
+  const expenses = months.map(m => m.expense || 0);
+  const savings  = months.map(m => m.savings || 0);
+
+  if (yearlyChart) yearlyChart.destroy();
+  yearlyChart = new Chart(document.getElementById('yearlyChart'), {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [
+        { label: 'Income',  data: incomes,  backgroundColor: '#10b98166', borderColor: '#10b981', borderWidth: 2, borderRadius: 4 },
+        { label: 'Expense', data: expenses, backgroundColor: '#ef444466', borderColor: '#ef4444', borderWidth: 2, borderRadius: 4 },
+        { label: 'Savings', data: savings,  type: 'line', borderColor: '#4f46e5', backgroundColor: '#4f46e511', fill: true, tension: 0.3, yAxisID: 'y' },
+      ],
+    },
+    options: { responsive: true, plugins: { legend: { position: 'bottom' } }, scales: { y: { beginAtZero: true } } },
+  });
+}
+
+function buildYearlyTable(months) {
+  const tbody = document.getElementById('yearlyTable');
+  if (!months.length) {
+    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:20px;color:var(--muted)">No data</td></tr>';
+    return;
+  }
+  tbody.innerHTML = months.map(m => {
+    const rate = m.income > 0 ? ((m.savings / m.income) * 100).toFixed(1) : '0.0';
+    const savColor = m.savings >= 0 ? 'var(--success)' : 'var(--danger)';
+    return `<tr>
+      <td><strong>${MONTHS[m.month]}</strong></td>
+      <td style="color:var(--success)">${fmt(m.income)}</td>
+      <td style="color:var(--danger)">${fmt(m.expense)}</td>
+      <td style="color:${savColor};font-weight:600">${fmt(m.savings)}</td>
+      <td>${rate}%</td>
+    </tr>`;
+  }).join('');
+
+  // Totals row
+  const totals = months.reduce((a, m) => ({ income: a.income + m.income, expense: a.expense + m.expense, savings: a.savings + m.savings }), { income: 0, expense: 0, savings: 0 });
+  const totalRate = totals.income > 0 ? ((totals.savings / totals.income) * 100).toFixed(1) : '0.0';
+  tbody.innerHTML += `
+    <tr style="background:var(--bg);font-weight:700;border-top:2px solid var(--border)">
+      <td>Total</td>
+      <td style="color:var(--success)">${fmt(totals.income)}</td>
+      <td style="color:var(--danger)">${fmt(totals.expense)}</td>
+      <td style="color:${totals.savings>=0?'var(--success)':'var(--danger)'}">${fmt(totals.savings)}</td>
+      <td>${totalRate}%</td>
+    </tr>`;
+}
+
+init();
+</script>
+</body>
+</html>
