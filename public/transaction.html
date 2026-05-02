@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Transactions — Finance Tracker</title>
+  <link rel="stylesheet" href="/css/main.css"/>
+</head>
+<body>
+<script src="/js/api.js"></script>
+<script src="/js/nav.js"></script>
+
+<main>
+<div class="container">
+  <div class="page-header">
+    <h1>💳 Transactions</h1>
+    <button class="btn btn-primary" onclick="openModal()">+ Add Transaction</button>
+  </div>
+
+  <!-- Filters -->
+  <div class="filters card" style="display:flex;gap:10px;flex-wrap:wrap;padding:14px 20px;margin-bottom:20px">
+    <select id="fType" onchange="loadTx()">
+      <option value="">All Types</option>
+      <option value="income">Income</option>
+      <option value="expense">Expense</option>
+    </select>
+    <select id="fCategory" onchange="loadTx()"><option value="">All Categories</option></select>
+    <input type="date" id="fStart" onchange="loadTx()" placeholder="From"/>
+    <input type="date" id="fEnd" onchange="loadTx()" placeholder="To"/>
+    <select id="fSort" onchange="loadTx()">
+      <option value="date">Sort: Date</option>
+      <option value="amount">Sort: Amount</option>
+    </select>
+    <select id="fOrder" onchange="loadTx()">
+      <option value="desc">Newest first</option>
+      <option value="asc">Oldest first</option>
+    </select>
+    <button class="btn btn-outline btn-sm" onclick="clearFilters()">Clear</button>
+  </div>
+
+  <!-- Table -->
+  <div class="card" style="padding:0;overflow:hidden">
+    <table>
+      <thead>
+        <tr>
+          <th>Date</th><th>Type</th><th>Category</th>
+          <th>Description</th><th>Amount</th><th>Receipt</th><th>Actions</th>
+        </tr>
+      </thead>
+      <tbody id="txBody"><tr><td colspan="7" style="text-align:center;padding:32px;color:var(--muted)">Loading...</td></tr></tbody>
+    </table>
+    <!-- Pagination -->
+    <div id="pagination" style="display:flex;gap:8px;justify-content:center;padding:16px"></div>
+  </div>
+</div>
+</main>
+
+<!-- Add/Edit Modal -->
+<div id="txModal" class="modal-overlay hidden">
+  <div class="modal">
+    <h2 id="modalTitle">Add Transaction</h2>
+    <div id="modalAlert" class="alert hidden"></div>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label>Type *</label>
+        <select id="txType" onchange="filterCatByType()">
+          <option value="expense">Expense</option>
+          <option value="income">Income</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Date *</label>
+        <input type="date" id="txDate"/>
+      </div>
+    </div>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label>Amount * <span style="color:var(--muted);font-size:12px">(negative = refund)</span></label>
+        <input type="number" id="txAmount" placeholder="0.00" step="0.01"/>
+      </div>
+      <div class="form-group">
+        <label>Currency</label>
+        <select id="txCurrency"></select>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label>Category</label>
+      <select id="txCategory"><option value="">— Uncategorized —</option></select>
+    </div>
+
+    <div class="form-group">
+      <label>Description</label>
+      <input type="text" id="txDesc" placeholder="e.g. Dinner at restaurant"/>
+    </div>
+
+    <div class="form-group">
+      <label>
+        <input type="checkbox" id="txRefund" style="width:auto;margin-right:6px"/>
+        Mark as refund
+      </label>
+    </div>
+
+    <!-- Receipt upload (only for edit or after create) -->
+    <div class="form-group" id="receiptGroup">
+      <label>Receipt (optional)</label>
+      <input type="file" id="txReceipt" accept="image/*,.pdf" style="padding:6px"/>
+    </div>
+
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" id="saveBtn" onclick="saveTx()">Save</button>
+    </div>
+  </div>
+</div>
+
+<script>
+let categories = [], allCategories = [], editId = null, currentPage = 1;
+const CURRENCIES = ['USD','EUR','GBP','INR','JPY','CAD','AUD','CHF','CNY','SGD'];
+
+async function init() {
+  allCategories = await api.get('/categories');
+  populateCurrencies();
+  populateCategoryFilter();
+  filterCatByType();
+  const today = new Date().toISOString().split('T')[0];
+  document.getElementById('txDate').value = today;
+  loadTx();
+}
+
+function populateCurrencies() {
+  const sel = document.getElementById('txCurrency');
+  CURRENCIES.forEach(c => sel.add(new Option(c, c)));
+  sel.value = 'INR';
+}
+
+function populateCategoryFilter() {
+  const sel = document.getElementById('fCategory');
+  sel.innerHTML = '<option value="">All Categories</option>';
+  allCategories.forEach(c => sel.add(new Option(`${c.icon} ${c.name}`, c.id)));
+}
+
+function filterCatByType() {
+  const type = document.getElementById('txType').value;
+  const sel = document.getElementById('txCategory');
+  sel.innerHTML = '<option value="">— Uncategorized —</option>';
+  allCategories.filter(c => c.type === type).forEach(c =>
+    sel.add(new Option(`${c.icon} ${c.name}`, c.id))
+  );
+}
+
+async function loadTx(page = currentPage) {
+  currentPage = page;
+  const params = new URLSearchParams({
+    type:        document.getElementById('fType').value,
+    category_id: document.getElementById('fCategory').value,
+    start_date:  document.getElementById('fStart').value,
+    end_date:    document.getElementById('fEnd').value,
+    sort:        document.getElementById('fSort').value,
+    order:       document.getElementById('fOrder').value,
+    page, limit: 15,
+  });
+  // Remove empty params
+  [...params.keys()].forEach(k => { if (!params.get(k)) params.delete(k); });
+
+  const data = await api.get('/transactions?' + params);
+  renderTable(data.transactions || []);
+  renderPagination(data.totalPages || 1, data.page || 1);
+}
+
+function renderTable(txs) {
+  const tbody = document.getElementById('txBody');
+  if (!txs.length) {
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:32px;color:var(--muted)">No transactions found.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = txs.map(t => `
+    <tr>
+      <td>${t.date}</td>
+      <td><span class="badge badge-${t.type}">${t.type}</span></td>
+      <td>${t.category_icon||'📦'} ${t.category_name||'—'}</td>
+      <td>${t.description||'—'}${t.is_refund ? ' <span style="font-size:11px;color:var(--success)">[refund]</span>' : ''}</td>
+      <td style="font-weight:600;color:${t.type==='income'?'var(--success)':'var(--danger)'}">
+        ${t.type==='income'?'+':'−'}${Math.abs(t.amount).toFixed(2)} ${t.currency}
+      </td>
+      <td>${t.receipt_url ? `<a href="${t.receipt_url}" target="_blank" style="font-size:13px;color:var(--primary)">View</a>` : '—'}</td>
+      <td>
+        <button class="btn btn-outline btn-sm" onclick="openModal('${t.id}')">Edit</button>
+        <button class="btn btn-danger btn-sm" style="margin-left:4px" onclick="deleteTx('${t.id}')">Del</button>
+      </td>
+    </tr>`).join('');
+}
+
+function renderPagination(total, current) {
+  const el = document.getElementById('pagination');
+  if (total <= 1) { el.innerHTML = ''; return; }
+  let html = '';
+  if (current > 1) html += `<button class="btn btn-outline btn-sm" onclick="loadTx(${current-1})">← Prev</button>`;
+  html += `<span style="font-size:13px;color:var(--muted);padding:5px 8px">Page ${current} of ${total}</span>`;
+  if (current < total) html += `<button class="btn btn-outline btn-sm" onclick="loadTx(${current+1})">Next →</button>`;
+  el.innerHTML = html;
+}
+
+function openModal(id = null) {
+  editId = id;
+  document.getElementById('modalTitle').textContent = id ? 'Edit Transaction' : 'Add Transaction';
+  document.getElementById('modalAlert').className = 'alert hidden';
+  document.getElementById('saveBtn').textContent = id ? 'Update' : 'Save';
+
+  if (!id) {
+    document.getElementById('txType').value = 'expense';
+    document.getElementById('txAmount').value = '';
+    document.getElementById('txCurrency').value = 'INR';
+    document.getElementById('txDate').value = new Date().toISOString().split('T')[0];
+    document.getElementById('txDesc').value = '';
+    document.getElementById('txRefund').checked = false;
+    document.getElementById('txCategory').value = '';
+    filterCatByType();
+  } else {
+    // Fetch existing transaction and pre-fill
+    api.get(`/transactions/${id}`).then(t => {
+      document.getElementById('txType').value = t.type;
+      filterCatByType();
+      document.getElementById('txAmount').value = t.amount;
+      document.getElementById('txCurrency').value = t.currency;
+      document.getElementById('txDate').value = t.date;
+      document.getElementById('txDesc').value = t.description || '';
+      document.getElementById('txRefund').checked = t.is_refund;
+      document.getElementById('txCategory').value = t.category_id || '';
+    });
+  }
+  document.getElementById('txModal').classList.remove('hidden');
+}
+
+function closeModal() {
+  document.getElementById('txModal').classList.add('hidden');
+  editId = null;
+}
+
+async function saveTx() {
+  const body = {
+    type:        document.getElementById('txType').value,
+    amount:      parseFloat(document.getElementById('txAmount').value),
+    currency:    document.getElementById('txCurrency').value,
+    date:        document.getElementById('txDate').value,
+    description: document.getElementById('txDesc').value,
+    is_refund:   document.getElementById('txRefund').checked,
+    category_id: document.getElementById('txCategory').value || null,
+  };
+
+  const alertEl = document.getElementById('modalAlert');
+  if (!body.amount || isNaN(body.amount)) {
+    alertEl.className = 'alert alert-error';
+    alertEl.textContent = 'Amount is required and cannot be zero';
+    return;
+  }
+
+  try {
+    let tx;
+    if (editId) {
+      tx = await api.put(`/transactions/${editId}`, body);
+    } else {
+      tx = await api.post('/transactions', body);
+    }
+
+    // Handle receipt upload
+    const fileInput = document.getElementById('txReceipt');
+    if (fileInput.files[0]) {
+      const fd = new FormData();
+      fd.append('receipt', fileInput.files[0]);
+      fd.append('transaction_id', tx.id || editId);
+      await api.upload('/receipts', fd);
+    }
+
+    closeModal();
+    loadTx();
+  } catch (e) {
+    alertEl.className = 'alert alert-error';
+    alertEl.textContent = e.message;
+  }
+}
+
+async function deleteTx(id) {
+  if (!confirm('Delete this transaction?')) return;
+  await api.delete(`/transactions/${id}`);
+  loadTx();
+}
+
+function clearFilters() {
+  ['fType','fCategory','fSort','fOrder'].forEach(id => document.getElementById(id).value = id==='fSort'?'date':id==='fOrder'?'desc':'');
+  ['fStart','fEnd'].forEach(id => document.getElementById(id).value = '');
+  loadTx(1);
+}
+
+init();
+</script>
+</body>
+</html>
