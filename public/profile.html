@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Profile — Finance Tracker</title>
+  <link rel="stylesheet" href="/css/main.css"/>
+</head>
+<body>
+<script src="/js/api.js"></script>
+<script src="/js/nav.js"></script>
+
+<main>
+<div class="container">
+  <div class="page-header"><h1>👤 Profile & Settings</h1></div>
+
+  <!-- Tab nav -->
+  <div style="display:flex;gap:8px;margin-bottom:24px;flex-wrap:wrap">
+    <button class="btn btn-primary" id="tabProfile"    onclick="switchTab('profile')">Profile</button>
+    <button class="btn btn-outline" id="tabCategories" onclick="switchTab('categories')">Categories</button>
+    <button class="btn btn-outline" id="tabReceipts"   onclick="switchTab('receipts')">Receipts</button>
+    <button class="btn btn-outline" id="tabCurrency"   onclick="switchTab('currency')">Currency</button>
+  </div>
+
+  <!-- ── PROFILE ─────────────────────────────────── -->
+  <div id="panelProfile">
+    <div class="grid-2">
+      <!-- Edit Profile -->
+      <div class="card">
+        <strong style="display:block;margin-bottom:16px">Edit Profile</strong>
+        <div id="profileAlert" class="alert hidden"></div>
+        <div class="form-group">
+          <label>Full Name</label>
+          <input type="text" id="pName" placeholder="Your name"/>
+        </div>
+        <div class="form-group">
+          <label>Email <span style="color:var(--muted);font-size:12px">(read-only)</span></label>
+          <input type="email" id="pEmail" readonly style="background:var(--bg);cursor:not-allowed"/>
+        </div>
+        <div class="form-group">
+          <label>Base Currency</label>
+          <select id="pCurrency">
+            <option value="USD">USD — US Dollar</option>
+            <option value="EUR">EUR — Euro</option>
+            <option value="GBP">GBP — British Pound</option>
+            <option value="INR">INR — Indian Rupee</option>
+            <option value="JPY">JPY — Japanese Yen</option>
+            <option value="CAD">CAD — Canadian Dollar</option>
+            <option value="AUD">AUD — Australian Dollar</option>
+            <option value="CHF">CHF — Swiss Franc</option>
+            <option value="SGD">SGD — Singapore Dollar</option>
+          </select>
+        </div>
+        <button class="btn btn-primary" onclick="saveProfile()">Save Changes</button>
+      </div>
+
+      <!-- Change Password -->
+      <div class="card">
+        <strong style="display:block;margin-bottom:16px">Change Password</strong>
+        <div id="pwAlert" class="alert hidden"></div>
+        <div class="form-group">
+          <label>Current Password</label>
+          <input type="password" id="pwCurrent" placeholder="••••••••"/>
+        </div>
+        <div class="form-group">
+          <label>New Password <span style="color:var(--muted);font-size:12px">(min 8 chars)</span></label>
+          <input type="password" id="pwNew" placeholder="••••••••"/>
+        </div>
+        <div class="form-group">
+          <label>Confirm New Password</label>
+          <input type="password" id="pwConfirm" placeholder="••••••••"/>
+        </div>
+        <button class="btn btn-primary" onclick="changePassword()">Update Password</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── CATEGORIES ──────────────────────────────── -->
+  <div id="panelCategories" class="hidden">
+    <div class="page-header" style="margin-bottom:16px">
+      <strong>Manage Categories</strong>
+      <button class="btn btn-primary btn-sm" onclick="openCatModal()">+ New Category</button>
+    </div>
+
+    <div class="grid-2">
+      <!-- Income categories -->
+      <div class="card">
+        <strong style="display:block;margin-bottom:12px">💰 Income Categories</strong>
+        <div id="incomeCats"></div>
+      </div>
+      <!-- Expense categories -->
+      <div class="card">
+        <strong style="display:block;margin-bottom:12px">💸 Expense Categories</strong>
+        <div id="expenseCats"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── RECEIPTS ─────────────────────────────────── -->
+  <div id="panelReceipts" class="hidden">
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+        <strong>Uploaded Receipts</strong>
+        <div>
+          <input type="file" id="quickReceiptFile" accept="image/*,.pdf" style="display:none" onchange="quickUpload()"/>
+          <button class="btn btn-primary btn-sm" onclick="document.getElementById('quickReceiptFile').click()">Upload Receipt</button>
+        </div>
+      </div>
+      <div id="receiptGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px">
+        <p style="color:var(--muted)">Loading...</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── CURRENCY CONVERTER ──────────────────────── -->
+  <div id="panelCurrency" class="hidden">
+    <div class="grid-2">
+      <div class="card">
+        <strong style="display:block;margin-bottom:16px">💱 Currency Converter</strong>
+        <div class="form-group">
+          <label>Amount</label>
+          <input type="number" id="convAmount" placeholder="100" value="100" step="0.01"/>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>From</label>
+            <select id="convFrom"></select>
+          </div>
+          <div class="form-group">
+            <label>To</label>
+            <select id="convTo"></select>
+          </div>
+        </div>
+        <button class="btn btn-primary" onclick="convertCurrency()">Convert</button>
+        <div id="convResult" style="margin-top:16px;padding:16px;background:var(--bg);border-radius:var(--radius);font-size:18px;font-weight:600;text-align:center;display:none"></div>
+      </div>
+
+      <div class="card">
+        <strong style="display:block;margin-bottom:16px">📋 Supported Currencies</strong>
+        <div id="currencyList" style="display:flex;flex-wrap:wrap;gap:8px"></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+</main>
+
+<!-- Category Modal -->
+<div id="catModal" class="modal-overlay hidden">
+  <div class="modal">
+    <h2 id="catModalTitle">New Category</h2>
+    <div id="catAlert" class="alert hidden"></div>
+    <div class="form-group">
+      <label>Name *</label>
+      <input type="text" id="catName" placeholder="e.g. Groceries"/>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Type *</label>
+        <select id="catType">
+          <option value="expense">Expense</option>
+          <option value="income">Income</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Icon (emoji)</label>
+        <input type="text" id="catIcon" placeholder="🛒" maxlength="4" style="font-size:22px;text-align:center"/>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeCatModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveCategory()">Save</button>
+    </div>
+  </div>
+</div>
+
+<script>
+let catEditId = null;
+
+/* ── Tab switching ──────────────────────────────── */
+const tabIds = ['profile','categories','receipts','currency'];
+function switchTab(tab) {
+  tabIds.forEach(t => {
+    document.getElementById('panel' + t.charAt(0).toUpperCase() + t.slice(1)).classList.toggle('hidden', t !== tab);
+    const btn = document.getElementById('tab' + t.charAt(0).toUpperCase() + t.slice(1));
+    if (btn) btn.className = t === tab ? 'btn btn-primary' : 'btn btn-outline';
+  });
+  if (tab === 'categories') loadCategories();
+  if (tab === 'receipts')   loadReceipts();
+  if (tab === 'currency')   loadCurrencyPanel();
+}
+
+/* ── Profile ────────────────────────────────────── */
+async function init() {
+  const user = await api.get('/auth/me');
+  document.getElementById('pName').value     = user.name;
+  document.getElementById('pEmail').value    = user.email;
+  document.getElementById('pCurrency').value = user.currency || 'INR';
+}
+
+async function saveProfile() {
+  const el = document.getElementById('profileAlert');
+  try {
+    const data = await api.put('/auth/profile', {
+      name:     document.getElementById('pName').value.trim(),
+      currency: document.getElementById('pCurrency').value,
+    });
+    showAlert('Profile updated!', 'success', el);
+  } catch (e) { showAlert(e.message, 'error', el); }
+}
+
+async function changePassword() {
+  const el = document.getElementById('pwAlert');
+  const cur  = document.getElementById('pwCurrent').value;
+  const nw   = document.getElementById('pwNew').value;
+  const conf = document.getElementById('pwConfirm').value;
+  if (!cur || !nw) return showAlert('All fields required', 'error', el);
+  if (nw !== conf) return showAlert('New passwords do not match', 'error', el);
+  try {
+    await api.put('/auth/change-password', { current_password: cur, new_password: nw });
+    showAlert('Password changed successfully!', 'success', el);
+    ['pwCurrent','pwNew','pwConfirm'].forEach(id => document.getElementById(id).value = '');
+  } catch (e) { showAlert(e.message, 'error', el); }
+}
+
+/* ── Categories ─────────────────────────────────── */
+async function loadCategories() {
+  const cats = await api.get('/categories');
+  renderCats(cats.filter(c => c.type === 'income'),  'incomeCats');
+  renderCats(cats.filter(c => c.type === 'expense'), 'expenseCats');
+}
+
+function renderCats(cats, containerId) {
+  const el = document.getElementById(containerId);
+  if (!cats.length) { el.innerHTML = '<p style="color:var(--muted);font-size:14px">None yet.</p>'; return; }
+  el.innerHTML = cats.map(c => `
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)">
+      <span style="font-size:15px">${c.icon || '📦'} ${c.name}
+        ${c.is_default ? '<span style="font-size:11px;color:var(--muted);margin-left:4px">system</span>' : ''}
+      </span>
+      ${!c.is_default ? `
+        <div style="display:flex;gap:6px">
+          <button class="btn btn-outline btn-sm" onclick="openCatModal('${c.id}','${c.name}','${c.type}','${c.icon||''}')">Edit</button>
+          <button class="btn btn-danger btn-sm" onclick="deleteCat('${c.id}')">Del</button>
+        </div>` : ''}
+    </div>`).join('');
+}
+
+function openCatModal(id=null, name='', type='expense', icon='') {
+  catEditId = id;
+  document.getElementById('catModalTitle').textContent = id ? 'Edit Category' : 'New Category';
+  document.getElementById('catAlert').className = 'alert hidden';
+  document.getElementById('catName').value = name;
+  document.getElementById('catType').value = type;
+  document.getElementById('catIcon').value = icon;
+  document.getElementById('catModal').classList.remove('hidden');
+}
+function closeCatModal() {
+  document.getElementById('catModal').classList.add('hidden');
+  catEditId = null;
+}
+
+async function saveCategory() {
+  const alertEl = document.getElementById('catAlert');
+  const body = {
+    name: document.getElementById('catName').value.trim(),
+    type: document.getElementById('catType').value,
+    icon: document.getElementById('catIcon').value.trim() || '📦',
+  };
+  if (!body.name) return showAlert('Name is required', 'error', alertEl);
+  try {
+    if (catEditId) await api.put(`/categories/${catEditId}`, body);
+    else           await api.post('/categories', body);
+    closeCatModal();
+    loadCategories();
+  } catch (e) { showAlert(e.message, 'error', alertEl); }
+}
+
+async function deleteCat(id) {
+  if (!confirm('Delete this category? Existing transactions will be uncategorized.')) return;
+  await api.delete(`/categories/${id}`);
+  loadCategories();
+}
+
+/* ── Receipts ───────────────────────────────────── */
+async function loadReceipts() {
+  const receipts = await api.get('/receipts');
+  const grid = document.getElementById('receiptGrid');
+  if (!receipts.length) {
+    grid.innerHTML = '<p style="color:var(--muted)">No receipts uploaded yet.</p>';
+    return;
+  }
+  grid.innerHTML = receipts.map(r => {
+    const isImg = r.mime_type && r.mime_type.startsWith('image/');
+    return `
+      <div class="card" style="padding:12px;text-align:center">
+        ${isImg
+          ? `<img src="${r.url}" style="width:100%;height:120px;object-fit:cover;border-radius:4px;margin-bottom:8px" alt="receipt"/>`
+          : `<div style="height:120px;display:flex;align-items:center;justify-content:center;font-size:36px;background:var(--bg);border-radius:4px;margin-bottom:8px">📄</div>`}
+        <div style="font-size:12px;color:var(--muted);margin-bottom:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.original_name || r.filename}</div>
+        ${r.transaction_desc ? `<div style="font-size:11px;color:var(--muted)">${r.transaction_desc}</div>` : ''}
+        <div style="display:flex;gap:6px;margin-top:8px;justify-content:center">
+          <a href="${r.url}" target="_blank" class="btn btn-outline btn-sm">View</a>
+          <button class="btn btn-danger btn-sm" onclick="deleteReceipt('${r.id}')">Del</button>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+async function quickUpload() {
+  const file = document.getElementById('quickReceiptFile').files[0];
+  if (!file) return;
+  const fd = new FormData();
+  fd.append('receipt', file);
+  await api.upload('/receipts', fd);
+  loadReceipts();
+}
+
+async function deleteReceipt(id) {
+  if (!confirm('Delete this receipt?')) return;
+  await api.delete(`/receipts/${id}`);
+  loadReceipts();
+}
+
+/* ── Currency ───────────────────────────────────── */
+async function loadCurrencyPanel() {
+  const currencies = await api.get('/currencies');
+
+  // Populate selects
+  [document.getElementById('convFrom'), document.getElementById('convTo')].forEach((sel, i) => {
+    sel.innerHTML = '';
+    currencies.forEach(c => sel.add(new Option(c, c)));
+    sel.value = i === 0 ? 'USD' : 'INR';
+  });
+
+  // Badge list
+  document.getElementById('currencyList').innerHTML = currencies.map(c =>
+    `<span style="background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:4px 10px;font-size:13px;font-weight:500">${c}</span>`
+  ).join('');
+}
+
+async function convertCurrency() {
+  const amount = parseFloat(document.getElementById('convAmount').value) || 1;
+  const from   = document.getElementById('convFrom').value;
+  const to     = document.getElementById('convTo').value;
+  const data   = await api.get(`/currencies/convert?from=${from}&to=${to}&amount=${amount}`);
+  const result = document.getElementById('convResult');
+  result.style.display = 'block';
+  result.innerHTML = `
+    <span style="color:var(--muted);font-size:14px">${amount} ${from} =</span><br/>
+    <span style="color:var(--primary)">${data.converted.toLocaleString()} ${to}</span>
+    <div style="font-size:12px;color:var(--muted);margin-top:4px">Rate: 1 ${from} = ${data.rate} ${to}</div>`;
+}
+
+/* ── Shared utils ───────────────────────────────── */
+function showAlert(msg, type, el) {
+  el.className = `alert alert-${type}`;
+  el.textContent = msg;
+  if (type === 'success') setTimeout(() => el.className = 'alert hidden', 3000);
+}
+
+init();
+</script>
+</body>
+</html>
