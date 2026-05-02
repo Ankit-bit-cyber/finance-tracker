@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Budgets — Finance Tracker</title>
+  <link rel="stylesheet" href="/css/main.css"/>
+</head>
+<body>
+<script src="/js/api.js"></script>
+<script src="/js/nav.js"></script>
+
+<main>
+<div class="container">
+  <div class="page-header">
+    <h1>🎯 Budgets</h1>
+    <button class="btn btn-primary" onclick="openModal()">+ Set Budget</button>
+  </div>
+
+  <!-- Month Picker -->
+  <div class="card" style="padding:14px 20px;margin-bottom:20px;display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+    <label style="margin:0;color:var(--muted);font-size:14px">Filter by month:</label>
+    <select id="fMonth" onchange="loadBudgets()">
+      <option value="">All</option>
+      <option value="1">January</option><option value="2">February</option>
+      <option value="3">March</option><option value="4">April</option>
+      <option value="5">May</option><option value="6">June</option>
+      <option value="7">July</option><option value="8">August</option>
+      <option value="9">September</option><option value="10">October</option>
+      <option value="11">November</option><option value="12">December</option>
+    </select>
+    <select id="fYear" onchange="loadBudgets()"></select>
+    <button class="btn btn-outline btn-sm" onclick="setCurrentMonth()">This Month</button>
+  </div>
+
+  <!-- Overview Cards -->
+  <div class="grid-4" style="margin-bottom:24px">
+    <div class="card"><div class="card-title">Total Budgeted</div><div class="card-value" id="totalBudgeted" style="color:var(--primary)">—</div></div>
+    <div class="card"><div class="card-title">Total Spent</div><div class="card-value expense" id="totalSpent">—</div></div>
+    <div class="card"><div class="card-title">Remaining</div><div class="card-value savings" id="totalRemaining">—</div></div>
+    <div class="card"><div class="card-title">Over Budget</div><div class="card-value" id="overCount" style="color:var(--danger)">—</div></div>
+  </div>
+
+  <!-- Budget Cards Grid -->
+  <div id="budgetGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px">
+    <p style="color:var(--muted)">Loading...</p>
+  </div>
+</div>
+</main>
+
+<!-- Add/Edit Modal -->
+<div id="budgetModal" class="modal-overlay hidden">
+  <div class="modal">
+    <h2 id="modalTitle">Set Budget</h2>
+    <div id="modalAlert" class="alert hidden"></div>
+
+    <div class="form-group">
+      <label>Category (Expense only) *</label>
+      <select id="bCategory"></select>
+    </div>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label>Budget Amount *</label>
+        <input type="number" id="bAmount" placeholder="5000" step="0.01" min="0.01"/>
+      </div>
+      <div class="form-group">
+        <label>Currency</label>
+        <select id="bCurrency">
+          <option value="USD">USD</option><option value="EUR">EUR</option>
+          <option value="GBP">GBP</option><option value="INR" selected>INR</option>
+          <option value="JPY">JPY</option><option value="CAD">CAD</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label>Month</label>
+        <select id="bMonth">
+          <option value="1">January</option><option value="2">February</option>
+          <option value="3">March</option><option value="4">April</option>
+          <option value="5">May</option><option value="6">June</option>
+          <option value="7">July</option><option value="8">August</option>
+          <option value="9">September</option><option value="10">October</option>
+          <option value="11">November</option><option value="12">December</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Year</label>
+        <select id="bYear"></select>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label>Alert when spending reaches <span id="alertPctLabel">80</span>%</label>
+      <input type="range" id="bAlertPct" min="10" max="100" step="5" value="80"
+             oninput="document.getElementById('alertPctLabel').textContent=this.value"
+             style="width:100%;padding:4px 0"/>
+    </div>
+
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveBudget()">Save</button>
+    </div>
+  </div>
+</div>
+
+<script>
+let categories = [], editId = null;
+
+async function init() {
+  // Populate year dropdowns
+  const now = new Date();
+  const curYear = now.getFullYear();
+  [document.getElementById('fYear'), document.getElementById('bYear')].forEach(sel => {
+    for (let y = curYear - 2; y <= curYear + 1; y++) sel.add(new Option(y, y));
+    sel.value = curYear;
+  });
+
+  // Set current month in filter
+  document.getElementById('fMonth').value = now.getMonth() + 1;
+  document.getElementById('bMonth').value = now.getMonth() + 1;
+
+  categories = (await api.get('/categories')).filter(c => c.type === 'expense');
+  const catSel = document.getElementById('bCategory');
+  categories.forEach(c => catSel.add(new Option(`${c.icon} ${c.name}`, c.id)));
+
+  loadBudgets();
+}
+
+function setCurrentMonth() {
+  const now = new Date();
+  document.getElementById('fMonth').value = now.getMonth() + 1;
+  document.getElementById('fYear').value  = now.getFullYear();
+  loadBudgets();
+}
+
+async function loadBudgets() {
+  const month = document.getElementById('fMonth').value;
+  const year  = document.getElementById('fYear').value;
+  const params = new URLSearchParams();
+  if (month) params.set('month', month);
+  if (year)  params.set('year', year);
+
+  const budgets = await api.get('/budgets?' + params);
+
+  // Overview totals
+  const totalBudgeted  = budgets.reduce((s, b) => s + parseFloat(b.amount),    0);
+  const totalSpent     = budgets.reduce((s, b) => s + parseFloat(b.spent||0),  0);
+  const totalRemaining = budgets.reduce((s, b) => s + parseFloat(b.remaining||0), 0);
+  const overCount      = budgets.filter(b => b.is_over_budget).length;
+
+  document.getElementById('totalBudgeted').textContent  = fmt(totalBudgeted);
+  document.getElementById('totalSpent').textContent     = fmt(totalSpent);
+  document.getElementById('totalRemaining').textContent = fmt(totalRemaining);
+  document.getElementById('overCount').textContent      = overCount + ' category' + (overCount !== 1 ? 'ies' : 'y');
+
+  renderBudgetCards(budgets);
+}
+
+function fmt(n) {
+  return parseFloat(n||0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function renderBudgetCards(budgets) {
+  const grid = document.getElementById('budgetGrid');
+  if (!budgets.length) {
+    grid.innerHTML = `
+      <div class="card" style="grid-column:1/-1;text-align:center;padding:40px">
+        <p style="color:var(--muted);margin-bottom:16px">No budgets set for this period.</p>
+        <button class="btn btn-primary" onclick="openModal()">+ Set your first budget</button>
+      </div>`;
+    return;
+  }
+
+  grid.innerHTML = budgets.map(b => {
+    const pct      = parseFloat(b.progress_pct) || 0;
+    const isOver   = b.is_over_budget;
+    const isWarn   = !isOver && pct >= (b.alert_at_pct || 80);
+    const barColor = isOver ? 'var(--danger)' : isWarn ? 'var(--warning)' : 'var(--primary)';
+    const statusBadge = isOver
+      ? `<span style="background:#fee2e2;color:#991b1b;font-size:11px;padding:2px 7px;border-radius:999px">⚠️ Over Budget</span>`
+      : isWarn
+      ? `<span style="background:#fef3c7;color:#92400e;font-size:11px;padding:2px 7px;border-radius:999px">⚡ Alert</span>`
+      : `<span style="background:#d1fae5;color:#065f46;font-size:11px;padding:2px 7px;border-radius:999px">✓ On Track</span>`;
+
+    return `
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px">
+          <div>
+            <div style="font-size:22px">${b.category_icon || '📦'}</div>
+            <div style="font-weight:600;margin-top:4px">${b.category_name}</div>
+          </div>
+          <div style="text-align:right">
+            ${statusBadge}
+            <div style="font-size:12px;color:var(--muted);margin-top:6px">${b.period} · ${b.month}/${b.year}</div>
+          </div>
+        </div>
+
+        <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:6px">
+          <span style="color:var(--muted)">Spent</span>
+          <span><strong style="color:${isOver?'var(--danger)':'var(--text)'}">${b.currency} ${fmt(b.spent)}</strong> / ${fmt(b.amount)}</span>
+        </div>
+
+        <div class="progress" style="margin-bottom:6px">
+          <div class="progress-bar" style="width:${Math.min(pct,100)}%;background:${barColor}"></div>
+        </div>
+
+        <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--muted);margin-bottom:14px">
+          <span>${pct}% used</span>
+          <span>Remaining: <strong style="color:${isOver?'var(--danger)':'var(--success)'}">${b.currency} ${fmt(b.remaining)}</strong></span>
+        </div>
+
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-outline btn-sm" onclick="openModal('${b.id}')">Edit</button>
+          <button class="btn btn-danger btn-sm" onclick="deleteBudget('${b.id}')">Delete</button>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function openModal(id = null) {
+  editId = id;
+  document.getElementById('modalTitle').textContent = id ? 'Edit Budget' : 'Set Budget';
+  document.getElementById('modalAlert').className   = 'alert hidden';
+
+  if (!id) {
+    document.getElementById('bAmount').value = '';
+    document.getElementById('bAlertPct').value = 80;
+    document.getElementById('alertPctLabel').textContent = '80';
+    const now = new Date();
+    document.getElementById('bMonth').value = now.getMonth() + 1;
+    document.getElementById('bYear').value  = now.getFullYear();
+  } else {
+    api.get('/budgets/' + id).then(b => {
+      document.getElementById('bCategory').value  = b.category_id;
+      document.getElementById('bAmount').value    = b.amount;
+      document.getElementById('bCurrency').value  = b.currency;
+      document.getElementById('bMonth').value     = b.month;
+      document.getElementById('bYear').value      = b.year;
+      document.getElementById('bAlertPct').value  = b.alert_at_pct;
+      document.getElementById('alertPctLabel').textContent = b.alert_at_pct;
+    });
+  }
+  document.getElementById('budgetModal').classList.remove('hidden');
+}
+
+function closeModal() {
+  document.getElementById('budgetModal').classList.add('hidden');
+  editId = null;
+}
+
+async function saveBudget() {
+  const alertEl = document.getElementById('modalAlert');
+  const body = {
+    category_id:  document.getElementById('bCategory').value,
+    amount:       parseFloat(document.getElementById('bAmount').value),
+    currency:     document.getElementById('bCurrency').value,
+    month:        parseInt(document.getElementById('bMonth').value),
+    year:         parseInt(document.getElementById('bYear').value),
+    alert_at_pct: parseInt(document.getElementById('bAlertPct').value),
+    period:       'monthly',
+  };
+
+  if (!body.category_id) return showAlert('Please select a category', alertEl);
+  if (!body.amount || body.amount <= 0) return showAlert('Amount must be positive', alertEl);
+
+  try {
+    if (editId) await api.put(`/budgets/${editId}`, body);
+    else        await api.post('/budgets', body);
+    closeModal();
+    loadBudgets();
+  } catch (e) { showAlert(e.message, alertEl); }
+}
+
+async function deleteBudget(id) {
+  if (!confirm('Delete this budget?')) return;
+  await api.delete(`/budgets/${id}`);
+  loadBudgets();
+}
+
+function showAlert(msg, el) {
+  el.className = 'alert alert-error';
+  el.textContent = msg;
+}
+
+init();
+</script>
+</body>
+</html>
