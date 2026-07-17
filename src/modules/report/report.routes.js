@@ -1,4 +1,8 @@
-// report.routes.js
-module.exports = (router) => {
-  router.get('/report', (req, res) => res.send('report'));
-};
+const express = require('express');
+const router = express.Router();
+const ctrl = require('./report.controller');
+
+router.get('/monthly', ctrl.monthly);
+router.get('/yearly',  ctrl.yearly);
+
+module.exports = router;
