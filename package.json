@@ -1,28 +1,47 @@
 {
   "name": "finance-tracker",
-  "version": "0.1.0",
-  "private": true,
+  "version": "1.0.0",
+  "description": "Personal Finance Tracker - FJ Backend Assignment",
   "main": "src/server.js",
   "scripts": {
-    "start": "node src/server.js"
+    "start": "node src/server.js",
+    "dev": "nodemon src/server.js",
+    "migrate": "node src/db/migrate.js",
+    "seed": "node src/db/seeders/seed.js",
+    "test": "jest --runInBand --forceExit",
+    "test:watch": "jest --watch"
   },
   "dependencies": {
-    "express": "^4.18.2",
-    "helmet": "^6.0.1",
-    "cors": "^2.8.5",
-    "morgan": "^1.10.0",
-    "express-session": "^1.17.3",
-    "passport": "^0.6.0",
     "bcryptjs": "^2.4.3",
-    "passport-google-oauth20": "^2.0.0",
-    "uuid": "^9.0.0",
-    "express-rate-limit": "^6.10.0",
+    "cors": "^2.8.5",
+    "decimal.js": "^10.4.3",
     "dotenv": "^16.3.1",
-    "pg": "^8.11.0",
-    "joi": "^17.9.2",
-    "winston": "^3.8.2",
-    "@sendgrid/mail": "^7.7.0",
-    "jsonwebtoken": "^9.0.0",
-    "axios": "^1.4.0"
+    "express": "^4.18.2",
+    "express-rate-limit": "^7.1.5",
+    "express-session": "^1.17.3",
+    "helmet": "^7.1.0",
+    "joi": "^17.11.0",
+    "jsonwebtoken": "^9.0.2",
+    "morgan": "^1.10.0",
+    "multer": "^1.4.5-lts.1",
+    "node-cron": "^3.0.3",
+    "nodemailer": "^6.9.7",
+    "@sendgrid/mail": "^8.1.0",
+    "passport": "^0.7.0",
+    "passport-google-oauth20": "^2.0.0",
+    "passport-local": "^1.0.0",
+    "pg": "^8.11.3",
+    "uuid": "^9.0.1",
+    "winston": "^3.11.0",
+    "axios": "^1.6.2"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "nodemon": "^3.0.2",
+    "supertest": "^6.3.3"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "testMatch": ["**/tests/**/*.test.js"]
   }
 }
