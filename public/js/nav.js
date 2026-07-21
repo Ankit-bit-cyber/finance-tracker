@@ -1,6 +1,9 @@
 // Shared navigation — included on every protected page
 (function () {
-  if (!api.getToken()) { window.location = '/index.html'; return; }
+  if (!api.getToken()) { 
+    window.location.href = '/index.html'; 
+    return; 
+  }
 
   const pages = [
     { href: '/dashboard.html',    label: '📊 Dashboard' },
@@ -10,13 +13,16 @@
     { href: '/profile.html',      label: '👤 Profile' },
   ];
 
+  // Get current page filename only
+  const currentPage = '/' + window.location.pathname.split('/').pop();
+
   const nav = document.createElement('nav');
   nav.innerHTML = `
     <div class="container">
       <div class="inner">
         <span class="brand">💰 Finance Tracker</span>
         ${pages.map(p =>
-          `<a href="${p.href}" class="${location.pathname === p.href ? 'active' : ''}">${p.label}</a>`
+          `<a href="${p.href}" class="${currentPage === p.href ? 'active' : ''}">${p.label}</a>`
         ).join('')}
         <span class="user-info" id="navUser"></span>
         <button class="btn btn-outline btn-sm" onclick="logout()">Logout</button>
@@ -26,12 +32,13 @@
 
   // Load user name
   api.get('/auth/me').then(u => {
-    document.getElementById('navUser').textContent = u.name;
+    const el = document.getElementById('navUser');
+    if (el) el.textContent = u.name;
   }).catch(() => {});
 
   window.logout = () => {
     api.clearToken();
-    window.location = '/index.html';
+    window.location.href = '/index.html';
   };
 
   // Notification badge

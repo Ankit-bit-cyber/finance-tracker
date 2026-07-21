@@ -48,12 +48,19 @@ app.use('/api/currencies',    authenticate, require('./modules/currency/currency
 app.get('/api/health', (req, res) => res.json({ status: 'ok', ts: new Date().toISOString() }));
 
 // ── Catch-all: serve frontend ────────────────────────────
+// Catch-all: serve frontend
 app.get('*', (req, res) => {
-  if (!req.path.startsWith('/api')) {
-    res.sendFile(path.join(__dirname, '..', 'public', 'index.html'));
-  } else {
-    res.status(404).json({ success: false, message: 'Route not found' });
+  if (req.path.startsWith('/api')) {
+    return res.status(404).json({ success: false, message: 'Route not found' });
   }
+  // Agar .html file hai toh directly serve karo
+  const filePath = path.join(__dirname, '..', 'public', req.path);
+  const fs = require('fs');
+  if (req.path !== '/' && fs.existsSync(filePath)) {
+    return res.sendFile(filePath);
+  }
+  // Default to index.html
+  res.sendFile(path.join(__dirname, '..', 'public', 'index.html'));
 });
 
 // ── Global error handler ─────────────────────────────────
